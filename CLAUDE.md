@@ -66,6 +66,9 @@ Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
 - Every retrieval/generation change must be run through `rag-eval` and the metric
   delta reported in the commit message. No upgrade lands on vibes.
 - Type hints everywhere; `ruff` for lint/format; `pytest` for tests.
+- Commit messages follow Conventional Commits: `type(scope): summary` (feat, fix,
+  refactor, docs, test, chore, perf, ci). Retrieval/generation commits include the
+  `rag-eval` before/after delta in the body.
 
 ## Roadmap (production refactor)
 
