@@ -13,13 +13,17 @@ classification, Malaysian road datasets — see `docs/`).
                  ┌─────────────── ingestion (offline) ───────────────┐
  PDFs in docs/ ──► load ──► chunk ──► embed (OpenAI text-embedding-3-small) ──► FAISS index
                                                                                     │
- user question ──► embed query ──► top-k similarity search ────────────────────────┘
-                                        │
-                              retrieved chunks + question
-                                        │
-                                        ▼
-                        DeepSeek chat LLM ──► grounded answer + sources
+ user question ──► dense search (FAISS) ──┐
+               └─► keyword search (BM25) ──┤ RRF fusion ──► LLM rerank ──► top-k chunks
+                                                                              │
+                                                                    chunks + question
+                                                                              ▼
+                                                DeepSeek chat LLM ──► grounded answer + sources
 ```
+
+Retrieval is **hybrid** (dense + BM25, Reciprocal Rank Fusion) with **listwise LLM
+reranking** — each step config-switchable and chosen by measurement on the eval set:
+dense-only 0.92 hit@4 / 0.83 MRR → hybrid 1.00 / 0.83 → hybrid+rerank 1.00 / 0.96.
 
 Two API providers are involved on purpose: **OpenAI** serves embeddings (DeepSeek does
 not offer an embedding API), **DeepSeek** generates answers (cheaper for chat).
@@ -74,8 +78,12 @@ A FastAPI backend arrives in Phase 3 of the roadmap (see [CLAUDE.md](CLAUDE.md))
 ```bash
 ruff check .        # lint
 ruff format .       # format
-pytest              # tests (arrive in Phase 4)
+rag-eval            # retrieval metrics against evals/golden.jsonl
+rag-eval --answers  # + LLM-judged answer faithfulness/relevance
+pytest              # tests (arrive in Phase 6)
 ```
+
+Retrieval/generation changes must ship with a `rag-eval` before/after delta.
 
 The index carries a fingerprint (embedding model, chunk params, corpus hash, pipeline
 version); `rag-ingest` and the app rebuild automatically when it goes stale. After

@@ -6,6 +6,7 @@ from environment variables / .env and fall back to the defaults below.
 """
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,6 +42,14 @@ class Settings(BaseSettings):
     chunk_size: int = 800
     chunk_overlap: int = 120
     top_k: int = 4
+
+    # Retrieval strategy — every mode is env-switchable (RETRIEVAL_MODE=dense rag-eval)
+    # so configurations can be compared on the eval harness without code changes.
+    # Defaults chosen by eval (2026-07-17): dense 0.92 hit@4 / 0.83 MRR ->
+    # hybrid 1.00 / 0.83 -> hybrid+rerank 1.00 / 0.96 on evals/golden.jsonl.
+    retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
+    rerank_enabled: bool = True
+    fetch_k: int = 20  # candidates fetched before rerank/truncation to top_k
 
 
 def get_settings() -> Settings:
