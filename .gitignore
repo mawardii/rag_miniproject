@@ -1,1 +1,22 @@
-/.env
+# Secrets — never commit these
+.env
+
+# Virtual environments
+rag-cloud/
+venv/
+.venv/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Derived data / build artifacts
+faiss_index/
+
+# IDE / OS noise
+.vscode/
+.idea/
+.DS_Store
