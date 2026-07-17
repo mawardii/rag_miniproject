@@ -17,6 +17,13 @@ making changes.**
 ## Commands
 
 ```bash
+# Install (deps + dev tools; pyproject.toml is the single source of truth)
+pip install -e ".[dev]"
+
+# Lint / format
+ruff check .
+ruff format .
+
 # Run the app (prototype entry point — will move to ui/ + FastAPI later)
 streamlit run main.py
 
@@ -39,7 +46,7 @@ Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
   requires a rebuild — say so in the PR/commit message.
 - `FAISS.load_local(..., allow_dangerous_deserialization=True)` is acceptable only because
   we exclusively load indexes we built ourselves. Never load an index from an untrusted source.
-- Pin dependencies in `requirements.txt` / `pyproject.toml`; don't add unpinned packages.
+- Pin dependencies in `pyproject.toml` (there is no requirements.txt); don't add unpinned packages.
 
 ## Conventions we are adopting during the refactor
 
@@ -53,7 +60,7 @@ Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
 
 ## Roadmap (production refactor)
 
-- [ ] **Phase 1 — Repo hygiene:** purge `rag-cloud/` venv + binaries from git, proper
+- [x] **Phase 1 — Repo hygiene:** purge `rag-cloud/` venv + binaries from git, proper
   `.gitignore`, `pyproject.toml`, pinned deps, README.
 - [ ] **Phase 2 — Architecture:** `src/rag/` package: `config.py`, `ingestion/`,
   `retrieval/`, `generation/`; CLI script for indexing; Streamlit becomes a thin client.
@@ -76,4 +83,5 @@ Update the checkboxes as phases complete.
   (it only splits on newlines); Phase 2 replaces it with `RecursiveCharacterTextSplitter`.
 - The docs-hash function `compute_docs_hash()` in `embeddings.py` exists but is never
   called — index staleness is currently manual ("Rebuild index" button).
-- Git history still contains the 190 MB venv until the history purge in Phase 1 is done.
+- Git history was rewritten on 2026-07-17 (git filter-repo) to purge the 190 MB venv;
+  any pre-rewrite clone must be re-cloned, not pulled.

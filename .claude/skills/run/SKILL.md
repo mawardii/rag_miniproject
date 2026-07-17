@@ -8,7 +8,7 @@ description: Launch the RAG app locally and verify it actually answers a questio
 ## Preconditions
 1. `.env` exists at repo root with `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` set
    (copy `example.env` if missing — but never invent keys).
-2. Dependencies installed: `pip install -r requirements.txt`.
+2. Dependencies installed: `pip install -e ".[dev]"`.
 3. If connectivity is in doubt, smoke-test first: `python query_test.py`
    (must print both "Success" lines).
 

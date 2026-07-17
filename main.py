@@ -1,27 +1,38 @@
 # main.py
 import os
 import time
-from langchain.chains import RetrievalQA
-from langchain.callbacks.manager import get_openai_callback
-from dotenv import load_dotenv
+
 import streamlit as st
-from embeddings import load_or_build_vectorstore  # Reuse embedding logic
+from dotenv import load_dotenv
+from langchain.callbacks.manager import get_openai_callback
+from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
+
+from embeddings import load_or_build_vectorstore  # Reuse embedding logic
 
 load_dotenv()
 
-def build_qa(model_name: str, temperature: float, top_k: int, return_sources: bool,
-             chunk_size: int, chunk_overlap: int, rebuild_counter: int):
+
+def build_qa(
+    model_name: str,
+    temperature: float,
+    top_k: int,
+    return_sources: bool,
+    chunk_size: int,
+    chunk_overlap: int,
+    rebuild_counter: int,
+):
     """Build the RAG chain with DeepSeek."""
     llm = ChatOpenAI(
         model=model_name,
         temperature=temperature,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
         base_url="https://api.deepseek.com",
-        max_tokens=1000
+        max_tokens=1000,
     )
-    db = load_or_build_vectorstore(chunk_size=chunk_size, chunk_overlap=chunk_overlap,
-                                   force_rebuild=(rebuild_counter > 0))
+    db = load_or_build_vectorstore(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap, force_rebuild=(rebuild_counter > 0)
+    )
     retriever = db.as_retriever(search_kwargs={"k": top_k})
     qa = RetrievalQA.from_chain_type(
         llm=llm,
@@ -31,6 +42,7 @@ def build_qa(model_name: str, temperature: float, top_k: int, return_sources: bo
     )
     return qa
 
+
 def main():
     st.set_page_config(page_title="Simple RAG QA", page_icon="💬", layout="centered")
     st.title("💬 Simple RAG QA (DeepSeek)")
@@ -38,14 +50,24 @@ def main():
 
     # Sidebar settings
     st.sidebar.header("⚙️ Settings")
-    fast_mode = st.sidebar.checkbox("Fast mode", value=True, help="Lower k and temperature for speed.")
+    fast_mode = st.sidebar.checkbox(
+        "Fast mode", value=True, help="Lower k and temperature for speed."
+    )
     model = st.sidebar.selectbox(
-        "Model", options=["deepseek-chat", "deepseek-coder"], index=0, help="Select a DeepSeek model.")
+        "Model",
+        options=["deepseek-chat", "deepseek-coder"],
+        index=0,
+        help="Select a DeepSeek model.",
+    )
     temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.2, 0.05)
     top_k = st.sidebar.slider("Top-k (retrieval)", 1, 8, 3)
     return_sources = st.sidebar.checkbox("Return sources", value=True)
-    chunk_size = st.sidebar.number_input("Chunk size", min_value=200, max_value=1500, value=500, step=50)
-    chunk_overlap = st.sidebar.number_input("Chunk overlap", min_value=0, max_value=400, value=50, step=10)
+    chunk_size = st.sidebar.number_input(
+        "Chunk size", min_value=200, max_value=1500, value=500, step=50
+    )
+    chunk_overlap = st.sidebar.number_input(
+        "Chunk overlap", min_value=0, max_value=400, value=50, step=10
+    )
 
     if fast_mode:
         temperature = min(temperature, 0.15)
@@ -59,7 +81,9 @@ def main():
     if not os.path.exists("docs"):
         os.makedirs("docs", exist_ok=True)
         with open(os.path.join("docs", "example.txt"), "w", encoding="utf-8") as f:
-            f.write("This is an example note. Add your .txt or .pdf files inside the 'docs' folder.")
+            f.write(
+                "This is an example note. Add your .txt or .pdf files inside the 'docs' folder."
+            )
 
     docs_empty = len(os.listdir("docs")) == 0
     if docs_empty:
@@ -67,9 +91,15 @@ def main():
         st.stop()
 
     with st.spinner("Indexing (first run may take a moment)..."):
-        qa = build_qa(model_name=model, temperature=temperature, top_k=top_k,
-                      return_sources=return_sources, chunk_size=chunk_size,
-                      chunk_overlap=chunk_overlap, rebuild_counter=st.session_state.rebuild_counter)
+        qa = build_qa(
+            model_name=model,
+            temperature=temperature,
+            top_k=top_k,
+            return_sources=return_sources,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            rebuild_counter=st.session_state.rebuild_counter,
+        )
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -105,15 +135,21 @@ def main():
                         with st.expander("Sources"):
                             for i, s in enumerate(sources, 1):
                                 st.markdown(f"**{i}.** `{s}`")
-                    st.caption(f"Response time: {elapsed:.2f}s | Tokens: {cb.total_tokens} | Est. Cost: ${cb.total_cost:.6f}")
+                    st.caption(
+                        f"Response time: {elapsed:.2f}s | Tokens: {cb.total_tokens}"
+                        f" | Est. Cost: ${cb.total_cost:.6f}"
+                    )
 
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": answer,
-                        "sources": sources if return_sources else [],
-                    })
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": answer,
+                            "sources": sources if return_sources else [],
+                        }
+                    )
             except Exception as e:
                 placeholder.error(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
