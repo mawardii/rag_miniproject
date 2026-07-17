@@ -93,11 +93,14 @@ def judge_answer(pipeline: RAGPipeline, question: str) -> tuple[dict, str]:
     prompt = JUDGE_TEMPLATE.format(
         question=question, context=format_context(result.context_docs), answer=result.answer
     )
-    response = pipeline.judge_llm.invoke(
+    response = pipeline.judge_llm.bind(response_format={"type": "json_object"}).invoke(
         [SystemMessage(content=JUDGE_SYSTEM), HumanMessage(content=prompt)]
     )
-    match = re.search(r"\{.*\}", str(response.content), re.DOTALL)
-    scores = json.loads(match.group()) if match else {}
+    try:
+        scores = json.loads(str(response.content))
+    except ValueError:
+        match = re.search(r"\{.*\}", str(response.content), re.DOTALL)
+        scores = json.loads(match.group()) if match else {}
     return scores, result.answer
 
 
