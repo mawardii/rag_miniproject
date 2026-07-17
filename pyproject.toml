@@ -17,7 +17,11 @@ dependencies = [
     "faiss-cpu==1.8.0",
     "pypdf==4.3.1",
     "tiktoken==0.7.0",
+    "pydantic-settings==2.4.0",
 ]
+
+[project.scripts]
+rag-ingest = "rag.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -25,10 +29,8 @@ dev = [
     "pytest==8.3.2",
 ]
 
-# Pre-Phase-2 flat layout: install the top-level modules directly.
-# Phase 2 replaces this with a proper src/rag package.
-[tool.setuptools]
-py-modules = ["main", "embeddings", "prototype", "query_test"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 100
@@ -38,6 +40,9 @@ extend-exclude = ["rag-cloud"]
 [tool.ruff.lint]
 # E/W pycodestyle, F pyflakes, I import sorting, B bugbear (real bug patterns), UP modernize syntax
 select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["rag"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

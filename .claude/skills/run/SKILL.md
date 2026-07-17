@@ -9,12 +9,12 @@ description: Launch the RAG app locally and verify it actually answers a questio
 1. `.env` exists at repo root with `DEEPSEEK_API_KEY` and `OPENAI_API_KEY` set
    (copy `example.env` if missing — but never invent keys).
 2. Dependencies installed: `pip install -e ".[dev]"`.
-3. If connectivity is in doubt, smoke-test first: `python query_test.py`
-   (must print both "Success" lines).
+3. If connectivity is in doubt, smoke-test first: `python scripts/smoke_test.py`
+   (must print both "OK" lines).
 
 ## Launch
 ```bash
-streamlit run main.py --server.headless true --server.port 8501
+python -m streamlit run ui/app.py --server.headless=true --server.port=8501
 ```
 Run in the background; the app is up when `http://localhost:8501` returns 200.
 First run builds the FAISS index from `docs/` — this calls the OpenAI embeddings API
@@ -31,5 +31,6 @@ RDD/RCD-IIUM-style datasets and list PDF sources in the Sources expander.
 
 ## Common failures
 - `AuthenticationError` on startup → wrong/missing `OPENAI_API_KEY` (embeddings, not the LLM).
-- Empty/garbage answers with tiny chunks → index was built with bad chunk settings; rebuild via the `ingest` skill.
+- Empty/garbage answers → suspect a stale/broken index; rebuild via the `ingest` skill.
+- `ValidationError` from Settings on startup → missing key in `.env`.
 - Port already in use → another Streamlit instance is running; kill it rather than switching ports.

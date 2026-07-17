@@ -40,10 +40,11 @@ copy example.env .env          # then fill in your real keys
 # Required: DEEPSEEK_API_KEY (chat), OPENAI_API_KEY (embeddings)
 
 # 4. Sanity-check connectivity (optional but recommended)
-python query_test.py
+python scripts/smoke_test.py
 
-# 5. Run — first launch builds the FAISS index (~1 min, ~$0.02 in embedding calls)
-streamlit run main.py
+# 5. Build the index (~1 min, ~$0.02 in embedding calls), then run the app
+rag-ingest
+streamlit run ui/app.py
 ```
 
 Ask something grounded in the corpus, e.g. *"Which YOLO versions are used for road
@@ -52,17 +53,21 @@ damage detection and how do they compare?"* — answers cite their source PDFs.
 ## Project layout
 
 ```
-docs/           source corpus (PDF research papers)
-main.py         Streamlit chat UI (prototype entry point)
-embeddings.py   index build/load logic
-prototype.py    minimal scripted RAG example
-query_test.py   API connectivity smoke test
-faiss_index/    generated vector index (git-ignored build artifact)
-.claude/        AI-collaborator skills and agents
+docs/                     source corpus (PDF research papers)
+src/rag/
+├── config.py             all settings (pydantic-settings; env/.env-driven)
+├── ingestion/            loaders (PDF/txt + NFKC normalization), chunking
+├── retrieval/            FAISS index lifecycle + staleness fingerprint
+├── generation/           prompts (explicit, versioned)
+├── pipeline.py           RAGPipeline facade — the only entry point consumers use
+└── cli.py                `rag-ingest` command
+ui/app.py                 Streamlit chat UI (thin client over RAGPipeline)
+scripts/smoke_test.py     API connectivity check
+faiss_index/              generated vector index (git-ignored build artifact)
+.claude/                  AI-collaborator skills and agents
 ```
 
-This flat layout is temporary; Phase 2 of the roadmap moves logic into a `src/rag/`
-package with separated ingestion / retrieval / generation modules and a FastAPI backend.
+A FastAPI backend arrives in Phase 3 of the roadmap (see [CLAUDE.md](CLAUDE.md)).
 
 ## Development
 
@@ -72,5 +77,6 @@ ruff format .       # format
 pytest              # tests (arrive in Phase 4)
 ```
 
-Changing chunking, loaders, or the embedding model **requires rebuilding the index**:
-delete `faiss_index/` and run `python embeddings.py`.
+The index carries a fingerprint (embedding model, chunk params, corpus hash, pipeline
+version); `rag-ingest` and the app rebuild automatically when it goes stale. After
+changing ingestion **code**, bump `PIPELINE_VERSION` in `src/rag/retrieval/vectorstore.py`.

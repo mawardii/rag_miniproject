@@ -24,14 +24,16 @@ pip install -e ".[dev]"
 ruff check .
 ruff format .
 
-# Run the app (prototype entry point — will move to ui/ + FastAPI later)
-streamlit run main.py
+# Run the app
+streamlit run ui/app.py
 
-# Build / rebuild the vector index
-python embeddings.py
+# Build / refresh the vector index (auto-detects staleness via fingerprint)
+rag-ingest
+rag-ingest --force                      # rebuild unconditionally
+rag-ingest --query "some question"      # retrieval spot-check (no LLM call)
 
 # Smoke-test API keys and connectivity
-python query_test.py
+python scripts/smoke_test.py
 ```
 
 Secrets live in `.env` (never committed — `example.env` is the template).
@@ -42,8 +44,9 @@ Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
 - **Never commit:** `.env`, `rag-cloud/` (a virtualenv — being purged from git),
   `faiss_index/` (build artifact), `__pycache__/`.
 - **Never log or print API keys**, even partially.
-- The FAISS index is derived data: any change to chunking, embedding model, or loaders
-  requires a rebuild — say so in the PR/commit message.
+- The FAISS index is derived data. Settings/corpus changes are caught automatically by
+  the index fingerprint; **code** changes to ingestion behavior (loaders, normalization,
+  splitter) must bump `PIPELINE_VERSION` in `src/rag/retrieval/vectorstore.py`.
 - `FAISS.load_local(..., allow_dangerous_deserialization=True)` is acceptable only because
   we exclusively load indexes we built ourselves. Never load an index from an untrusted source.
 - Pin dependencies in `pyproject.toml` (there is no requirements.txt); don't add unpinned packages.
@@ -62,8 +65,8 @@ Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
 
 - [x] **Phase 1 — Repo hygiene:** purge `rag-cloud/` venv + binaries from git, proper
   `.gitignore`, `pyproject.toml`, pinned deps, README.
-- [ ] **Phase 2 — Architecture:** `src/rag/` package: `config.py`, `ingestion/`,
-  `retrieval/`, `generation/`; CLI script for indexing; Streamlit becomes a thin client.
+- [x] **Phase 2 — Architecture:** `src/rag/` package: `config.py`, `ingestion/`,
+  `retrieval/`, `generation/`; `rag-ingest` CLI; Streamlit is a thin client (`ui/app.py`).
 - [ ] **Phase 3 — API layer:** FastAPI service (`/query`, `/healthz`), request/response
   models, error handling, timeouts, streaming.
 - [ ] **Phase 4 — Quality:** golden QA dataset in `evals/`, retrieval + answer metrics
@@ -77,11 +80,13 @@ Update the checkboxes as phases complete.
 
 ## Gotchas
 
-- `main.py` currently rebuilds the QA chain on every Streamlit rerun — known perf issue,
-  fixed in Phase 2 with caching.
-- `CharacterTextSplitter(separator="\n")` frequently produces oversized chunks on PDFs
-  (it only splits on newlines); Phase 2 replaces it with `RecursiveCharacterTextSplitter`.
-- The docs-hash function `compute_docs_hash()` in `embeddings.py` exists but is never
-  called — index staleness is currently manual ("Rebuild index" button).
+- All pipeline consumers (UI, CLI, future API/eval) must go through `rag.pipeline.RAGPipeline`
+  and `rag.config.Settings` — never instantiate LLM/retriever clients ad hoc.
+- Windows consoles are cp1252: PDF-derived text can contain characters they can't print.
+  CLI entry points call `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`.
+- PDF text is NFKC-normalized at load time (ligatures like ﬁ → fi); skipping this makes
+  embeddings mismatch plain-ASCII queries.
+- Sanity bound: the current 13-PDF corpus yields ~800 chunks at 800/120. An order-of-
+  magnitude deviation after an ingestion change means loaders or chunking broke.
 - Git history was rewritten on 2026-07-17 (git filter-repo) to purge the 190 MB venv;
   any pre-rewrite clone must be re-cloned, not pulled.
