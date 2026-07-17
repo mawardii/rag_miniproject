@@ -27,7 +27,8 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr
 
     # Generation
-    chat_model: str = "deepseek-chat"
+    # deepseek-chat alias is deprecated 2026-07-24 per official docs
+    chat_model: str = "deepseek-v4-flash"
     chat_base_url: str = "https://api.deepseek.com"
     temperature: float = 0.2
     max_tokens: int = 1000

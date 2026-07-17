@@ -59,6 +59,10 @@ class RAGPipeline:
             max_tokens=self.settings.max_tokens,
             timeout=60,
             max_retries=2,
+            # v4 models default to thinking mode, which spends the max_tokens budget
+            # on hidden reasoning and can return empty content. Disable explicitly —
+            # this matches the behavior of the retired deepseek-chat alias.
+            extra_body={"thinking": {"type": "disabled"}},
         )
 
     def _utility_llm(self, max_tokens: int) -> ChatOpenAI:
@@ -71,11 +75,12 @@ class RAGPipeline:
             max_tokens=max_tokens,
             timeout=30,
             max_retries=2,
+            extra_body={"thinking": {"type": "disabled"}},
         )
 
     @cached_property
     def _rerank_llm(self) -> ChatOpenAI:
-        return self._utility_llm(max_tokens=100)
+        return self._utility_llm(max_tokens=150)
 
     @cached_property
     def judge_llm(self) -> ChatOpenAI:

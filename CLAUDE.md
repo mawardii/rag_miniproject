@@ -7,7 +7,7 @@ making changes.**
 
 ## Stack
 
-- **LLM:** DeepSeek (`deepseek-chat`) via OpenAI-compatible API (`base_url=https://api.deepseek.com`)
+- **LLM:** DeepSeek (`deepseek-v4-flash`) via OpenAI-compatible API (`base_url=https://api.deepseek.com`)
 - **Embeddings:** OpenAI `text-embedding-3-small`
 - **Vector store:** FAISS (local, persisted to `faiss_index/`)
 - **Orchestration:** LangChain
