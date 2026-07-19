@@ -16,6 +16,9 @@ __pycache__/
 # Derived data / build artifacts
 faiss_index/
 
+# Corpus PDFs are public SEC filings — fetched via scripts/download_corpus.py, not committed
+docs/*.pdf
+
 # IDE / OS noise
 .vscode/
 .idea/

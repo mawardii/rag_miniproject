@@ -22,13 +22,13 @@ normalization, splitter), bump `PIPELINE_VERSION` in `src/rag/retrieval/vectorst
 — content hashing cannot see code changes.
 
 ## Verify
-Build logs `Index built: N chunks`. Sanity bounds for the current 13-PDF corpus:
-~800 chunks at the default 800/120 settings. N < 100 means loaders silently failed;
-N > 5,000 means chunking is misconfigured.
+Build logs `Index built: N chunks`. Sanity bounds for the current 18-filing SEC corpus
+(fetched by `scripts/download_corpus.py`): ~13.8k chunks at the default 800/120
+settings. N < 2,000 means loaders silently failed; N > 50,000 means chunking broke.
 
 Then spot-check retrieval:
 ```bash
-rag-ingest --query "YOLOv8 road damage detection"
+rag-ingest --query "What drove AMD's revenue growth in FY2022?"
 ```
 All hits should come from relevant papers and read as clean text (no ligature junk
 like "classiﬁcation" — NFKC normalization handles this at load time).

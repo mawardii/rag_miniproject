@@ -46,10 +46,13 @@ class Settings(BaseSettings):
 
     # Retrieval strategy — every mode is env-switchable (RETRIEVAL_MODE=dense rag-eval)
     # so configurations can be compared on the eval harness without code changes.
-    # Defaults chosen by eval (2026-07-17): dense 0.92 hit@4 / 0.83 MRR ->
-    # hybrid 1.00 / 0.83 -> hybrid+rerank 1.00 / 0.96 on evals/golden.jsonl.
-    retrieval_mode: Literal["dense", "hybrid"] = "hybrid"
-    rerank_enabled: bool = True
+    # Defaults are corpus-dependent and chosen by rag-eval, never by vibes.
+    # SEC-filings corpus (2026-07-18, 69 FinanceBench questions): dense 0.93 hit@4 /
+    # 0.81 MRR beat hybrid (0.86/0.77), hybrid+rerank (0.90/0.77), dense+rerank
+    # (0.91/0.83) — BM25's keyword votes drag in other companies' filings on a
+    # vocabulary-homogeneous corpus. (Old road-damage paper corpus: hybrid+rerank won.)
+    retrieval_mode: Literal["dense", "hybrid"] = "dense"
+    rerank_enabled: bool = False
     fetch_k: int = 20  # candidates fetched before rerank/truncation to top_k
 
 

@@ -1,8 +1,11 @@
-# Road-Damage Research RAG
+# Financial Filings RAG
 
-A Retrieval-Augmented Generation (RAG) QA system that answers questions grounded in a
-corpus of road-damage-detection research papers (YOLO-based detection, pavement crack
-classification, Malaysian road datasets — see `docs/`).
+A Retrieval-Augmented Generation (RAG) QA system that answers analyst-style questions
+grounded in corporate SEC filings — 10-Ks, 10-Qs, 8-Ks, and earnings releases from 14
+public companies (3M, AMD, Boeing, Pfizer, PepsiCo, ...), curated from the
+[FinanceBench](https://github.com/patronus-ai/financebench) benchmark. Document QA over
+filings is the flagship enterprise RAG use case (research copilots at investment banks,
+diligence tooling), which makes this corpus an honest, business-shaped testbed.
 
 > **Status:** under active refactor from prototype to production service.
 > Roadmap and progress live in [CLAUDE.md](CLAUDE.md).
@@ -13,17 +16,18 @@ classification, Malaysian road datasets — see `docs/`).
                  ┌─────────────── ingestion (offline) ───────────────┐
  PDFs in docs/ ──► load ──► chunk ──► embed (OpenAI text-embedding-3-small) ──► FAISS index
                                                                                     │
- user question ──► dense search (FAISS) ──┐
-               └─► keyword search (BM25) ──┤ RRF fusion ──► LLM rerank ──► top-k chunks
-                                                                              │
-                                                                    chunks + question
-                                                                              ▼
+ user question ──► dense search (FAISS) ──┬──► top-k chunks ──► chunks + question
+               └─► keyword search (BM25) ─┘ [+ RRF fusion,               │
+                     (hybrid mode only)       optional LLM rerank]       ▼
                                                 DeepSeek chat LLM ──► grounded answer + sources
 ```
 
-Retrieval is **hybrid** (dense + BM25, Reciprocal Rank Fusion) with **listwise LLM
-reranking** — each step config-switchable and chosen by measurement on the eval set:
-dense-only 0.92 hit@4 / 0.83 MRR → hybrid 1.00 / 0.83 → hybrid+rerank 1.00 / 0.96.
+Retrieval strategy is **config-switchable** — dense-only, hybrid (dense + BM25 with
+Reciprocal Rank Fusion), and optional listwise LLM reranking — and the default is
+chosen by measurement on the eval set, per corpus. On the current SEC-filings corpus
+(69 FinanceBench questions) dense-only wins (0.93 hit@4 / 0.81 MRR); on a
+research-paper corpus with distinctive vocabulary, hybrid+rerank won. Corpus
+properties decide; `rag-eval` is the referee.
 
 Two API providers are involved on purpose: **OpenAI** serves embeddings (DeepSeek does
 not offer an embedding API), **DeepSeek** generates answers (cheaper for chat).
@@ -43,21 +47,25 @@ pip install -e ".[dev]"
 copy example.env .env          # then fill in your real keys
 # Required: DEEPSEEK_API_KEY (chat), OPENAI_API_KEY (embeddings)
 
-# 4. Sanity-check connectivity (optional but recommended)
+# 4. Fetch the corpus (public SEC filings; PDFs are git-ignored)
+python scripts/download_corpus.py
+
+# 5. Sanity-check connectivity (optional but recommended)
 python scripts/smoke_test.py
 
-# 5. Build the index (~1 min, ~$0.02 in embedding calls), then run the app
+# 6. Build the index (~14k chunks, ~$0.10 in embedding calls), then run the app
 rag-ingest
 streamlit run ui/app.py
 ```
 
-Ask something grounded in the corpus, e.g. *"Which YOLO versions are used for road
-damage detection and how do they compare?"* — answers cite their source PDFs.
+Ask something an analyst would, e.g. *"What drove AMD's revenue change in FY2022?"* —
+answers cite the source filing and page.
 
 ## Project layout
 
 ```
-docs/                     source corpus (PDF research papers)
+docs/                     corpus: SEC filings (git-ignored; scripts/download_corpus.py)
+evals/                    golden QA set generated from FinanceBench (scripts/build_golden.py)
 src/rag/
 ├── config.py             all settings (pydantic-settings; env/.env-driven)
 ├── ingestion/            loaders (PDF/txt + NFKC normalization), chunking

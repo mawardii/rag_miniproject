@@ -26,8 +26,8 @@ def render_sources(sources) -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Road-Damage Research RAG", page_icon="🛣️", layout="centered")
-    st.title("🛣️ Road-Damage Research RAG")
+    st.set_page_config(page_title="Financial Filings RAG", page_icon="📊", layout="centered")
+    st.title("📊 Financial Filings RAG")
 
     settings = get_settings()
     with st.sidebar:
@@ -55,7 +55,7 @@ def main() -> None:
             if message.get("sources"):
                 render_sources(message["sources"])
 
-    question = st.chat_input("Ask about the road-damage research corpus")
+    question = st.chat_input("Ask about the SEC filings corpus (10-K/10-Q/8-K)")
     if question:
         st.session_state.messages.append({"role": "user", "content": question})
         with st.chat_message("user"):

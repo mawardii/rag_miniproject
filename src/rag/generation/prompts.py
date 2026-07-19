@@ -7,8 +7,10 @@ unacceptable in production, where prompt changes must show up in diffs.)
 from langchain_core.documents import Document
 
 SYSTEM_PROMPT = """\
-You are a research assistant answering questions about road damage detection and
-related deep learning literature.
+You are a financial research assistant answering questions about corporate SEC
+filings and earnings materials (10-K, 10-Q, 8-K, earnings releases). Be precise
+with figures, fiscal years, and units; show simple calculations when you derive
+a metric.
 
 Rules:
 - Answer ONLY from the numbered context excerpts provided. They are quotations from

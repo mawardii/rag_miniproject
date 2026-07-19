@@ -26,8 +26,8 @@ and can take a minute for the full PDF corpus.
 ## Verify (don't skip)
 A 200 from Streamlit only proves the server started. To verify the RAG path works,
 ask a corpus-grounded question and check the answer cites sources, e.g.:
-"What datasets are used for road damage detection?" — the answer should mention
-RDD/RCD-IIUM-style datasets and list PDF sources in the Sources expander.
+"What drove AMD's revenue change in FY2022?" — the answer should mention EPYC/
+Data Center growth and cite AMD_2022_10K.pdf in the Sources expander.
 
 ## Common failures
 - `AuthenticationError` on startup → wrong/missing `OPENAI_API_KEY` (embeddings, not the LLM).

@@ -33,12 +33,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_GOLDEN = PROJECT_ROOT / "evals" / "golden.jsonl"
 
 JUDGE_SYSTEM = """\
-You are a strict evaluator of RAG answers. Score the answer on two axes, 1-5:
+You are a strict evaluator of RAG answers. Score the answer on three axes, 1-5:
 - faithfulness: 5 = every claim is directly supported by the context excerpts;
   1 = contradicts or invents beyond the context. Saying "the context does not
   contain this" when it truly does not is faithful (5), not a failure.
 - relevance: 5 = fully addresses the question; 1 = off-topic.
-Respond with ONLY a JSON object: {"faithfulness": <int>, "relevance": <int>}"""
+- correctness: compare against the reference answer written by a human analyst:
+  5 = same conclusion and figures (minor rounding/wording differences are fine);
+  3 = partially correct or incomplete; 1 = wrong conclusion or wrong figures.
+  If no reference answer is provided, omit this key.
+Respond with ONLY a JSON object:
+{"faithfulness": <int>, "relevance": <int>, "correctness": <int>}"""
 
 JUDGE_TEMPLATE = """\
 Question: {question}
@@ -47,7 +52,10 @@ Context excerpts given to the system:
 {context}
 
 Answer to evaluate:
-{answer}"""
+{answer}
+
+Reference answer (ground truth):
+{reference}"""
 
 
 @dataclass
@@ -88,10 +96,13 @@ def evaluate_retrieval(pipeline: RAGPipeline, golden: list[dict]) -> list[Retrie
     return rows
 
 
-def judge_answer(pipeline: RAGPipeline, question: str) -> tuple[dict, str]:
+def judge_answer(pipeline: RAGPipeline, question: str, reference: str | None) -> tuple[dict, str]:
     result = pipeline.answer(question)
     prompt = JUDGE_TEMPLATE.format(
-        question=question, context=format_context(result.context_docs), answer=result.answer
+        question=question,
+        context=format_context(result.context_docs),
+        answer=result.answer,
+        reference=reference or "(none provided)",
     )
     response = pipeline.judge_llm.bind(response_format={"type": "json_object"}).invoke(
         [SystemMessage(content=JUDGE_SYSTEM), HumanMessage(content=prompt)]
@@ -145,20 +156,25 @@ def main() -> None:
 
     if args.answers:
         print("\njudging answers (LLM calls)...")
-        faith, rel = [], []
+        faith, rel, correct = [], [], []
         for item in golden:
-            scores, answer = judge_answer(pipeline, item["question"])
-            f, r = scores.get("faithfulness"), scores.get("relevance")
+            scores, answer = judge_answer(pipeline, item["question"], item.get("answer"))
+            f, r, c = (scores.get(k) for k in ("faithfulness", "relevance", "correctness"))
             if f:
                 faith.append(f)
             if r:
                 rel.append(r)
-            print(f"  faith={f} rel={r}  {item['question'][:60]}")
+            if c:
+                correct.append(c)
+            print(f"  faith={f} rel={r} correct={c}  {item['question'][:55]}")
         if faith:
-            print(
+            summary = (
                 f"\nanswers: faithfulness={statistics.mean(faith):.2f}/5"
                 f"  relevance={statistics.mean(rel):.2f}/5"
             )
+            if correct:
+                summary += f"  correctness={statistics.mean(correct):.2f}/5"
+            print(summary)
 
 
 if __name__ == "__main__":

@@ -18,12 +18,17 @@ rag-eval --answers      # + generation + LLM judge (~24 extra DeepSeek calls)
 RETRIEVAL_MODE=dense RERANK_ENABLED=false rag-eval
 ```
 
-## Reference numbers (2026-07-18, evals/golden.jsonl, 12 questions, deepseek-v4-flash)
+## Reference numbers (2026-07-18, SEC-filings corpus, 69 FinanceBench questions, deepseek-v4-flash)
 | config | hit@4 | MRR |
 |---|---|---|
-| dense only | 0.92 | 0.83 |
-| hybrid | 1.00 | 0.83 |
-| hybrid + rerank (default) | 1.00 | 1.00 |
+| dense only (default) | 0.93 | 0.81 |
+| hybrid | 0.86 | 0.77 |
+| hybrid + rerank | 0.90 | 0.77 |
+| dense + rerank | 0.91 | 0.83 |
+
+Defaults are corpus-dependent: on the previous road-damage paper corpus hybrid+rerank
+won (1.00/1.00); on SEC filings BM25 keyword votes drag in other companies' filings.
+Re-run the full 4-config ablation after any corpus change.
 
 Answer quality at default config: faithfulness 5.0/5, relevance 5.0/5.
 A regression below these numbers blocks the change unless explicitly accepted.

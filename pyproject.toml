@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "rag-miniproject"
 version = "0.1.0"
-description = "RAG QA service over road-damage-detection research papers (FAISS + DeepSeek + OpenAI embeddings)"
+description = "RAG QA service over SEC filings (FAISS + DeepSeek + OpenAI embeddings, FinanceBench eval)"
 requires-python = ">=3.10"
 dependencies = [
     "langchain==0.3.7",
