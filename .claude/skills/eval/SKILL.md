@@ -30,7 +30,10 @@ Defaults are corpus-dependent: on the previous road-damage paper corpus hybrid+r
 won (1.00/1.00); on SEC filings BM25 keyword votes drag in other companies' filings.
 Re-run the full 4-config ablation after any corpus change.
 
-Answer quality at default config: faithfulness 5.0/5, relevance 5.0/5.
+Answer quality at default config (dense-only): faithfulness 4.96/5, relevance 4.97/5,
+correctness 3.75/5 (vs FinanceBench gold answers). The correctness gap is dominated by
+numeric/table questions — PyPDF table extraction is the suspected ceiling; a loader
+upgrade (+ PIPELINE_VERSION bump) is the designated fix, not prompt tweaks.
 A regression below these numbers blocks the change unless explicitly accepted.
 
 ## Interpreting
