@@ -53,6 +53,18 @@ rag-ingest
 streamlit run ui/app.py
 ```
 
+If you are using the existing local `rag-cloud` virtualenv instead of `.venv`, activate it
+first:
+
+```powershell
+.\rag-cloud\Scripts\Activate.ps1
+```
+
+Then run the same `pip`, `rag-ingest`, `rag-eval`, and `streamlit` commands above.
+`rag-cloud/` is intentionally ignored by git because virtualenv launchers contain
+machine-specific absolute paths. If commands fail with a missing Python path, recreate
+the venv rather than committing fixes inside `rag-cloud/`.
+
 Ask something an analyst would, for example:
 
 ```text
@@ -97,3 +109,16 @@ The index carries a fingerprint: embedding model, chunk params, corpus hash, and
 pipeline version. `rag-ingest` and the app rebuild automatically when it goes stale.
 After changing ingestion code behavior, bump `PIPELINE_VERSION` in
 `src/rag/retrieval/vectorstore.py`.
+
+## Environment Checks
+
+After activating your virtualenv, these commands should resolve inside that environment:
+
+```powershell
+Get-Command python,pip,ruff,pytest
+python --version
+python -m pip show rag-miniproject
+```
+
+If `pytest` or `python` points at a deleted base interpreter, the virtualenv is stale.
+Recreate it from a working Python 3.10+ install and rerun `pip install -e ".[dev]"`.

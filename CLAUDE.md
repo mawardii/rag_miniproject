@@ -48,6 +48,27 @@ RETRIEVAL_MODE=dense RERANK_ENABLED=false rag-eval
 Secrets live in `.env`, never in git. Required keys: `DEEPSEEK_API_KEY`,
 `OPENAI_API_KEY`.
 
+## Local Environment
+
+The developer may use the existing ignored `rag-cloud/` virtualenv:
+
+```powershell
+.\rag-cloud\Scripts\Activate.ps1
+```
+
+Do not commit files from `rag-cloud/`. Windows virtualenv launchers contain absolute
+paths to the base interpreter, so a venv can work on one machine and fail in another
+shell with `No Python at ...`. If that happens, recreate the virtualenv from a working
+Python 3.10+ install and reinstall with `pip install -e ".[dev]"`.
+
+Useful checks after activation:
+
+```powershell
+Get-Command python,pip,ruff,pytest
+python --version
+python -m pip show rag-miniproject
+```
+
 ## Repo Rules
 
 - Never commit `.env`, `rag-cloud/`, `faiss_index/`, or `__pycache__/`.
