@@ -13,6 +13,8 @@ dependencies = [
     "langchain-community==0.3.7",
     "openai>=1.60.0",
     "python-dotenv==1.0.1",
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
     "streamlit==1.38.0",
     "faiss-cpu==1.8.0",
     "pypdf==4.3.1",

@@ -51,6 +51,9 @@ python scripts/smoke_test.py
 # 6. Build the index, then run the app
 rag-ingest
 streamlit run ui/app.py
+
+# Optional: run the API instead of the Streamlit UI
+uvicorn rag.api.app:app --host 127.0.0.1 --port 8000
 ```
 
 If you are using the existing local `rag-cloud` virtualenv instead of `.venv`, activate it
@@ -101,6 +104,7 @@ ruff format .       # format
 rag-eval            # retrieval metrics against evals/golden.jsonl
 rag-eval --answers  # plus LLM-judged answer quality
 pytest              # pure unit tests; no API keys required
+uvicorn rag.api.app:app --reload
 ```
 
 Retrieval and generation changes should ship with a `rag-eval` before/after delta.

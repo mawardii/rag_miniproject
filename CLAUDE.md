@@ -31,6 +31,9 @@ ruff format .
 # Run the app
 streamlit run ui/app.py
 
+# Run the API
+uvicorn rag.api.app:app --host 127.0.0.1 --port 8000
+
 # Build or refresh the vector index
 rag-ingest
 rag-ingest --force
@@ -102,8 +105,8 @@ python -m pip show rag-miniproject
   quality, and `rag-eval`.
 - [x] **Phase 4 - Retrieval options:** dense search, BM25+dense hybrid retrieval with
   RRF, optional LLM listwise reranking, and env-switchable config.
-- [ ] **Phase 5 - API layer:** FastAPI service with `/query`, `/healthz`, request/
-  response models, error handling, timeouts, and streaming path.
+- [x] **Phase 5 - API layer:** FastAPI service with `/query`, `/healthz`, request/
+  response models, error handling, and model/client timeouts. Streaming is deferred.
 - [ ] **Phase 6 - Observability + tests:** structured logging, request IDs, token/cost
   tracking, pytest unit tests, and CI.
 - [ ] **Phase 7 - Deployment:** Dockerfile, docker-compose, health checks, and deploy
