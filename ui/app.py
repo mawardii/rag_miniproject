@@ -1,8 +1,8 @@
-"""Streamlit chat UI — a thin client over rag.pipeline.RAGPipeline.
+"""Streamlit chat UI: a thin client over rag.pipeline.RAGPipeline.
 
 No pipeline logic lives here: no chunking knobs, no retrieval parameters.
-Those belong to rag.config so that serving, CLI, and evaluation all run the
-same pipeline. This file only renders chat state and calls pipeline.answer().
+Those belong to rag.config so serving, CLI, and evaluation all run the same
+pipeline. This file only renders chat state and calls pipeline.answer().
 """
 
 import streamlit as st
@@ -26,8 +26,12 @@ def render_sources(sources) -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Financial Filings RAG", page_icon="📊", layout="centered")
-    st.title("📊 Financial Filings RAG")
+    st.set_page_config(
+        page_title="Financial Filings RAG",
+        page_icon=":bar_chart:",
+        layout="centered",
+    )
+    st.title("Financial Filings RAG")
 
     settings = get_settings()
     with st.sidebar:
@@ -35,9 +39,9 @@ def main() -> None:
         st.caption(
             f"model: `{settings.chat_model}`\n\n"
             f"embeddings: `{settings.embedding_model}`\n\n"
-            f"chunk: {settings.chunk_size}/{settings.chunk_overlap} · top-k: {settings.top_k}"
+            f"chunk: {settings.chunk_size}/{settings.chunk_overlap} | top-k: {settings.top_k}"
         )
-        st.caption("Change values in .env / rag.config — not here — so eval and serving match.")
+        st.caption("Change values in .env / rag.config, not here, so eval and serving match.")
         if st.button("Rebuild index"):
             with st.spinner("Rebuilding index..."):
                 build_index(settings)
@@ -66,12 +70,12 @@ def main() -> None:
                 with st.spinner("Thinking..."):
                     result = pipeline.answer(question)
             except Exception:
-                st.error("Something went wrong answering that — check the server logs.")
+                st.error("Something went wrong answering that. Check the server logs.")
                 raise
             st.markdown(result.answer)
             render_sources(result.sources)
             st.caption(
-                f"{result.latency_s:.2f}s · {result.input_tokens} in / "
+                f"{result.latency_s:.2f}s | {result.input_tokens} in / "
                 f"{result.output_tokens} out tokens"
             )
             st.session_state.messages.append(

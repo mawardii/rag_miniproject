@@ -26,8 +26,8 @@ RETRIEVAL_MODE=dense RERANK_ENABLED=false rag-eval
 | hybrid + rerank | 0.90 | 0.77 |
 | dense + rerank | 0.91 | 0.83 |
 
-Defaults are corpus-dependent: on the previous road-damage paper corpus hybrid+rerank
-won (1.00/1.00); on SEC filings BM25 keyword votes drag in other companies' filings.
+Defaults are corpus-dependent. On SEC filings, BM25 keyword votes can drag in other
+companies' filings, so dense-only is the measured default.
 Re-run the full 4-config ablation after any corpus change.
 
 Answer quality at default config (dense-only): faithfulness 4.96/5, relevance 4.97/5,
@@ -41,7 +41,7 @@ A regression below these numbers blocks the change unless explicitly accepted.
   fusion). Reranking cannot fix what was never retrieved.
 - **MRR drop with flat hit@k** → ordering problem: look at rerank prompt/parsing.
 - **faithfulness drop** → generation problem: prompt grounding rules, context size.
-- The golden set is 12 questions — treat small deltas (±0.05) as noise; inspect the
+- The golden set is 69 questions — treat small deltas (±0.05) as noise; inspect the
   per-question PASS/MISS lines before concluding anything.
 
 ## Caveats

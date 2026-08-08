@@ -1,113 +1,114 @@
-# RAG Mini-Project → Production RAG Service
+# RAG Mini-Project -> Production RAG Service
 
-A RAG (Retrieval-Augmented Generation) QA system over corporate SEC filings
-(10-K/10-Q/8-K/earnings, curated from the FinanceBench benchmark; fetched into `docs/`
-by `scripts/download_corpus.py` — PDFs are not committed). Mid-refactor from a Streamlit
-prototype to a production-grade service. **Check the Roadmap section below for the
-current phase before making changes.**
+A RAG QA system over corporate SEC filings (10-K, 10-Q, 8-K, and earnings
+materials), curated from the FinanceBench benchmark and fetched into `docs/` by
+`scripts/download_corpus.py`. The project is mid-refactor from a Streamlit prototype
+to a production-grade service.
 
 ## Stack
 
-- **LLM:** DeepSeek (`deepseek-v4-flash`) via OpenAI-compatible API (`base_url=https://api.deepseek.com`)
+- **LLM:** DeepSeek (`deepseek-v4-flash`) via OpenAI-compatible API
+  (`base_url=https://api.deepseek.com`)
 - **Embeddings:** OpenAI `text-embedding-3-small`
-- **Vector store:** FAISS (local, persisted to `faiss_index/`)
+- **Vector store:** FAISS, persisted to `faiss_index/`
 - **Orchestration:** LangChain
-- **UI:** Streamlit (`main.py`)
-- **Python:** 3.10
+- **UI:** Streamlit (`ui/app.py`)
+- **Python:** 3.10+
 
 ## Commands
 
 ```bash
-# Install (deps + dev tools; pyproject.toml is the single source of truth)
+# Install dependencies and dev tools
 pip install -e ".[dev]"
 
-# Fetch the corpus (public SEC filings; PDFs are git-ignored)
+# Fetch the corpus
 python scripts/download_corpus.py
 
-# Lint / format
+# Lint and format
 ruff check .
 ruff format .
 
 # Run the app
 streamlit run ui/app.py
 
-# Build / refresh the vector index (auto-detects staleness via fingerprint)
+# Build or refresh the vector index
 rag-ingest
-rag-ingest --force                      # rebuild unconditionally
-rag-ingest --query "some question"      # retrieval spot-check (no LLM call)
+rag-ingest --force
+rag-ingest --query "some question"
 
 # Smoke-test API keys and connectivity
 python scripts/smoke_test.py
 
-# Evaluate the pipeline (retrieval metrics; --answers adds LLM-judged quality)
+# Evaluate the pipeline
 rag-eval
 rag-eval --answers
-RETRIEVAL_MODE=dense RERANK_ENABLED=false rag-eval   # compare configs via env overrides
+RETRIEVAL_MODE=dense RERANK_ENABLED=false rag-eval
 ```
 
-Secrets live in `.env` (never committed — `example.env` is the template).
-Required keys: `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`.
+Secrets live in `.env`, never in git. Required keys: `DEEPSEEK_API_KEY`,
+`OPENAI_API_KEY`.
 
-## Repo rules (non-negotiable)
+## Repo Rules
 
-- **Never commit:** `.env`, `rag-cloud/` (a virtualenv — being purged from git),
-  `faiss_index/` (build artifact), `__pycache__/`.
-- **Never log or print API keys**, even partially.
-- The FAISS index is derived data. Settings/corpus changes are caught automatically by
-  the index fingerprint; **code** changes to ingestion behavior (loaders, normalization,
-  splitter) must bump `PIPELINE_VERSION` in `src/rag/retrieval/vectorstore.py`.
-- `FAISS.load_local(..., allow_dangerous_deserialization=True)` is acceptable only because
-  we exclusively load indexes we built ourselves. Never load an index from an untrusted source.
-- Pin dependencies in `pyproject.toml` (there is no requirements.txt); don't add unpinned packages.
+- Never commit `.env`, `rag-cloud/`, `faiss_index/`, or `__pycache__/`.
+- Never log or print API keys, even partially.
+- The FAISS index is derived data. Settings and corpus changes are caught by the
+  index fingerprint; code changes to ingestion behavior must bump
+  `PIPELINE_VERSION` in `src/rag/retrieval/vectorstore.py`.
+- `FAISS.load_local(..., allow_dangerous_deserialization=True)` is acceptable only
+  for indexes this code built locally. Never load an index from an untrusted source.
+- Pin dependencies in `pyproject.toml`; there is no `requirements.txt`.
 
-## Conventions we are adopting during the refactor
+## Conventions
 
-- Package code lives in `src/rag/`; scripts in `scripts/`; tests in `tests/`; eval sets in `evals/`.
-- Configuration via `pydantic-settings` (single `Settings` class in `src/rag/config.py`) —
-  no scattered `os.getenv()` calls.
-- Ingestion, retrieval, and generation are separate modules with typed interfaces —
-  the UI and API are thin layers on top.
-- Every retrieval/generation change must be run through `rag-eval` and the metric
-  delta reported in the commit message. No upgrade lands on vibes.
-- Type hints everywhere; `ruff` for lint/format; `pytest` for tests.
-- Commit messages follow Conventional Commits: `type(scope): summary` (feat, fix,
-  refactor, docs, test, chore, perf, ci). Retrieval/generation commits include the
-  `rag-eval` before/after delta in the body.
+- Package code lives in `src/rag/`; scripts in `scripts/`; tests in `tests/`; eval
+  sets in `evals/`.
+- Configuration lives in `src/rag/config.py`; avoid scattered `os.getenv()` calls.
+- Ingestion, retrieval, generation, and serving layers stay separate.
+- UI, eval, CLI, and future API consumers go through `rag.pipeline.RAGPipeline`.
+- Retrieval and generation changes should be measured with `rag-eval`.
+- Commit messages follow Conventional Commits.
 
-## Roadmap (production refactor)
+## Roadmap
 
-- [x] **Phase 1 — Repo hygiene:** purge `rag-cloud/` venv + binaries from git, proper
-  `.gitignore`, `pyproject.toml`, pinned deps, README.
-- [x] **Phase 2 — Architecture:** `src/rag/` package: `config.py`, `ingestion/`,
-  `retrieval/`, `generation/`; `rag-ingest` CLI; Streamlit is a thin client (`ui/app.py`).
-- [x] **Phase 3 — Eval harness:** golden QA dataset in `evals/`, retrieval metrics
-  (hit@k, MRR), LLM-judged answer faithfulness, `rag-eval` CLI. Lands BEFORE retrieval
-  upgrades so every upgrade ships with a measured delta.
-- [x] **Phase 4 — Industry-standard retrieval:** hybrid search (BM25 + dense, RRF fusion),
-  LLM listwise reranking, config-switchable modes. Measured: dense 0.92 hit@4 / 0.83 MRR
-  → hybrid 1.00 / 0.83 → hybrid+rerank 1.00 / 0.96.
-- [ ] **Phase 5 — API layer:** FastAPI service (`/query`, `/healthz`), request/response
-  models, error handling, timeouts, streaming.
-- [ ] **Phase 6 — Observability + tests:** structured logging, request IDs, token/cost
-  tracking, pytest unit tests, CI via GitHub Actions.
-- [ ] **Phase 7 — Deployment:** Dockerfile (multi-stage), docker-compose (API + UI),
-  health checks, deploy docs.
+- [x] **Phase 1 - Repo hygiene:** `.gitignore`, `pyproject.toml`, pinned deps, README,
+  and ignored runtime artifacts.
+- [x] **Phase 2 - Architecture:** `src/rag/` package, `Settings`, ingestion/retrieval/
+  generation modules, `rag-ingest`, and thin Streamlit UI.
+- [x] **Phase 3 - Eval harness:** golden QA dataset, hit@k, MRR, LLM-judged answer
+  quality, and `rag-eval`.
+- [x] **Phase 4 - Retrieval options:** dense search, BM25+dense hybrid retrieval with
+  RRF, optional LLM listwise reranking, and env-switchable config.
+- [ ] **Phase 5 - API layer:** FastAPI service with `/query`, `/healthz`, request/
+  response models, error handling, timeouts, and streaming path.
+- [ ] **Phase 6 - Observability + tests:** structured logging, request IDs, token/cost
+  tracking, pytest unit tests, and CI.
+- [ ] **Phase 7 - Deployment:** Dockerfile, docker-compose, health checks, and deploy
+  docs.
 
-Update the checkboxes as phases complete.
+## Current Retrieval Baseline
+
+Reference numbers for the SEC-filings corpus, 69 FinanceBench questions,
+`deepseek-v4-flash`, 2026-07-18:
+
+| Config | hit@4 | MRR |
+|---|---:|---:|
+| dense only (default) | 0.93 | 0.81 |
+| hybrid | 0.86 | 0.77 |
+| hybrid + rerank | 0.90 | 0.77 |
+| dense + rerank | 0.91 | 0.83 |
+
+Answer quality at the default dense-only config: faithfulness 4.96/5, relevance
+4.97/5, correctness 3.75/5. The correctness gap appears concentrated in numeric
+and table-heavy questions.
 
 ## Gotchas
 
-- All pipeline consumers (UI, CLI, future API/eval) must go through `rag.pipeline.RAGPipeline`
-  and `rag.config.Settings` — never instantiate LLM/retriever clients ad hoc.
-- Windows consoles are cp1252: PDF-derived text can contain characters they can't print.
-  CLI entry points call `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`.
-- PDF text is NFKC-normalized at load time (ligatures like ﬁ → fi); skipping this makes
-  embeddings mismatch plain-ASCII queries.
-- Sanity bound: the current 18-filing corpus yields ~13.8k chunks at 800/120 (10-Ks are
-  dense). An order-of-magnitude deviation after an ingestion change means loaders or
-  chunking broke.
-- The golden set (`evals/golden.jsonl`) is generated by `scripts/build_golden.py` from
-  FinanceBench's open questions (CC BY-NC 4.0) — regenerate it after changing the corpus
-  in `scripts/download_corpus.py`; don't hand-edit it.
-- Git history was rewritten on 2026-07-17 (git filter-repo) to purge the 190 MB venv;
-  any pre-rewrite clone must be re-cloned, not pulled.
+- Windows consoles often default to cp1252; CLI entry points call
+  `sys.stdout.reconfigure(encoding="utf-8", errors="replace")`.
+- PDF text is NFKC-normalized at load time; skipping this can hurt retrieval for
+  plain-ASCII queries.
+- The current 18-filing corpus yields roughly 13.8k chunks at 800/120. Large
+  deviations after ingestion changes usually mean loader or chunking behavior changed.
+- `evals/golden.jsonl` is generated by `scripts/build_golden.py` from FinanceBench's
+  open questions. Regenerate it after changing the corpus.

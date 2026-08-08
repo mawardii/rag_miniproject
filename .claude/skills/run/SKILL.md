@@ -20,7 +20,7 @@ Run in the background; the app is up when `http://localhost:8501` returns 200.
 First run builds the FAISS index from `docs/` — this calls the OpenAI embeddings API
 and can take a minute for the full PDF corpus.
 
-> Phase 3 of the roadmap adds a FastAPI backend; once it lands, start it with
+> Phase 5 of the roadmap adds a FastAPI backend; once it lands, start it with
 > `uvicorn rag.api.app:app` and update this skill.
 
 ## Verify (don't skip)

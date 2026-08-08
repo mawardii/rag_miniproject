@@ -1,1 +1,1 @@
-"""RAG QA service over road-damage-detection research papers."""
+"""RAG QA service over corporate financial filings."""

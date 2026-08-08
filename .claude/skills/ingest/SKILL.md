@@ -30,7 +30,7 @@ Then spot-check retrieval:
 ```bash
 rag-ingest --query "What drove AMD's revenue growth in FY2022?"
 ```
-All hits should come from relevant papers and read as clean text (no ligature junk
+All hits should come from relevant filings and read as clean text (no ligature junk
 like "classiﬁcation" — NFKC normalization handles this at load time).
 
 ## Rules
