@@ -100,7 +100,7 @@ ruff check .        # lint
 ruff format .       # format
 rag-eval            # retrieval metrics against evals/golden.jsonl
 rag-eval --answers  # plus LLM-judged answer quality
-pytest              # once Phase 6 tests are added
+pytest              # pure unit tests; no API keys required
 ```
 
 Retrieval and generation changes should ship with a `rag-eval` before/after delta.

@@ -123,6 +123,12 @@ Answer quality at the default dense-only config: faithfulness 4.96/5, relevance
 4.97/5, correctness 3.75/5. The correctness gap appears concentrated in numeric
 and table-heavy questions.
 
+## Test Coverage
+
+The initial pytest suite covers pure logic only: prompt/context formatting, rerank
+response parsing, golden-file loading, retrieval metric calculation, and index
+fingerprint hashing. These tests should not require API keys, PDFs, or a FAISS index.
+
 ## Gotchas
 
 - Windows consoles often default to cp1252; CLI entry points call
