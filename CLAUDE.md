@@ -76,6 +76,8 @@ python -m pip show rag-miniproject
 - The FAISS index is derived data. Settings and corpus changes are caught by the
   index fingerprint; code changes to ingestion behavior must bump
   `PIPELINE_VERSION` in `src/rag/retrieval/vectorstore.py`.
+- Index rebuilds save to a temporary sibling directory before replacing the live
+  `faiss_index/`, with rollback if the final move fails.
 - `FAISS.load_local(..., allow_dangerous_deserialization=True)` is acceptable only
   for indexes this code built locally. Never load an index from an untrusted source.
 - Pin dependencies in `pyproject.toml`; there is no `requirements.txt`.

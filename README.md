@@ -107,6 +107,7 @@ Retrieval and generation changes should ship with a `rag-eval` before/after delt
 
 The index carries a fingerprint: embedding model, chunk params, corpus hash, and
 pipeline version. `rag-ingest` and the app rebuild automatically when it goes stale.
+Rebuilds are written to a temporary sibling directory before replacing the live index.
 After changing ingestion code behavior, bump `PIPELINE_VERSION` in
 `src/rag/retrieval/vectorstore.py`.
 

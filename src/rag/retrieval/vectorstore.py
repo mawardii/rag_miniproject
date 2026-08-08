@@ -1,16 +1,18 @@
 """FAISS index lifecycle: build, fingerprint, load-or-rebuild.
 
 The fingerprint is the safety mechanism: an index is only valid for the exact
-(corpus, embedding model, chunking) that produced it. Query vectors from a
-different embedding model, or chunks cut differently, degrade retrieval
-*silently* — answers get worse with no error anywhere. So we persist the
-fingerprint next to the index and refuse to trust a stale one.
+corpus, embedding model, and chunking settings that produced it. Query vectors
+from a different embedding model, or chunks cut differently, degrade retrieval
+silently. We persist the fingerprint next to the index and refuse to trust a
+stale one.
 """
 
 import hashlib
 import json
 import logging
 import shutil
+import tempfile
+import uuid
 from pathlib import Path
 
 from langchain_community.vectorstores import FAISS
@@ -25,13 +27,12 @@ logger = logging.getLogger(__name__)
 FINGERPRINT_FILE = "fingerprint.json"
 
 # Bump whenever ingestion/preprocessing CODE changes behavior (loaders, normalization,
-# splitter). Settings and corpus changes are hashed automatically; code changes are not
-# — this constant closes that gap so stale indexes still rebuild.
+# splitter). Settings and corpus changes are hashed automatically; code changes are not.
 PIPELINE_VERSION = 2
 
 
 def _corpus_hash(docs_dir: Path) -> str:
-    """Content hash of the corpus — deterministic across machines (unlike mtimes)."""
+    """Content hash of the corpus, deterministic across machines."""
     hasher = hashlib.sha256()
     for path in sorted(p for p in docs_dir.rglob("*") if p.is_file()):
         hasher.update(path.name.encode())
@@ -56,6 +57,32 @@ def _embeddings(settings: Settings) -> OpenAIEmbeddings:
     )
 
 
+def _new_temp_index_dir(index_dir: Path) -> Path:
+    index_dir.parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f".{index_dir.name}-", dir=index_dir.parent))
+
+
+def _swap_index_dir(new_dir: Path, index_dir: Path) -> None:
+    """Replace the live index with rollback if the final move fails."""
+    backup_dir: Path | None = None
+    if index_dir.exists():
+        backup_dir = index_dir.with_name(f".{index_dir.name}.backup-{uuid.uuid4().hex}")
+        shutil.move(str(index_dir), str(backup_dir))
+
+    try:
+        shutil.move(str(new_dir), str(index_dir))
+    except Exception:
+        if backup_dir is not None and backup_dir.exists() and not index_dir.exists():
+            shutil.move(str(backup_dir), str(index_dir))
+        raise
+    else:
+        if backup_dir is not None:
+            shutil.rmtree(backup_dir, ignore_errors=True)
+    finally:
+        if new_dir.exists():
+            shutil.rmtree(new_dir, ignore_errors=True)
+
+
 def build_index(settings: Settings) -> FAISS:
     """Build the index from scratch and persist it with its fingerprint."""
     docs = load_documents(settings.docs_dir)
@@ -64,11 +91,11 @@ def build_index(settings: Settings) -> FAISS:
 
     index = FAISS.from_documents(chunks, _embeddings(settings))
 
-    if settings.index_dir.exists():
-        shutil.rmtree(settings.index_dir)
-    index.save_local(str(settings.index_dir))
+    temp_index_dir = _new_temp_index_dir(settings.index_dir)
+    index.save_local(str(temp_index_dir))
     fingerprint = compute_fingerprint(settings)
-    (settings.index_dir / FINGERPRINT_FILE).write_text(json.dumps(fingerprint, indent=2))
+    (temp_index_dir / FINGERPRINT_FILE).write_text(json.dumps(fingerprint, indent=2))
+    _swap_index_dir(temp_index_dir, settings.index_dir)
     logger.info("Index built: %d chunks -> %s", len(chunks), settings.index_dir)
     return index
 
@@ -88,6 +115,6 @@ def load_or_build_index(settings: Settings, force_rebuild: bool = False) -> FAIS
                 allow_dangerous_deserialization=True,
             )
         changed = [k for k in current if stored.get(k) != current[k]]
-        logger.warning("Index stale (changed: %s) — rebuilding.", ", ".join(changed))
+        logger.warning("Index stale (changed: %s) - rebuilding.", ", ".join(changed))
 
     return build_index(settings)
