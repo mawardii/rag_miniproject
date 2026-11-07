@@ -18,7 +18,7 @@ from langchain_openai import ChatOpenAI
 from rag.config import Settings, get_settings
 from rag.generation.prompts import SYSTEM_PROMPT, build_user_message
 from rag.retrieval.rerank import llm_rerank
-from rag.retrieval.retrievers import HybridRetriever
+from rag.retrieval.retrievers import HybridRetriever, TableBoost
 from rag.retrieval.vectorstore import load_or_build_index
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,7 @@ class RAGPipeline:
         self._hybrid = (
             HybridRetriever(self._index) if self.settings.retrieval_mode == "hybrid" else None
         )
+        self._table_boost = TableBoost(list(self._index.docstore._dict.values()))
         self._llm = ChatOpenAI(
             model=self.settings.chat_model,
             api_key=self.settings.deepseek_api_key.get_secret_value(),
@@ -94,6 +95,7 @@ class RAGPipeline:
             candidates = self._hybrid.retrieve(question, fetch_k)
         else:
             candidates = self._index.similarity_search(question, k=fetch_k)
+        candidates = self._table_boost.boost(question, candidates, fetch_k)
         if s.rerank_enabled:
             return llm_rerank(self._rerank_llm, question, candidates, s.top_k)
         return candidates[: s.top_k]

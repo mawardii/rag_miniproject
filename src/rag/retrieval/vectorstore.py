@@ -21,6 +21,7 @@ from langchain_openai import OpenAIEmbeddings
 from rag.config import Settings
 from rag.ingestion.chunking import chunk_documents
 from rag.ingestion.loaders import load_documents
+from rag.ingestion.tables import tag_chunk_type
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ FINGERPRINT_FILE = "fingerprint.json"
 
 # Bump whenever ingestion/preprocessing CODE changes behavior (loaders, normalization,
 # splitter). Settings and corpus changes are hashed automatically; code changes are not.
-PIPELINE_VERSION = 2
+PIPELINE_VERSION = 4
 
 
 def _corpus_hash(docs_dir: Path) -> str:
@@ -87,6 +88,7 @@ def build_index(settings: Settings) -> FAISS:
     """Build the index from scratch and persist it with its fingerprint."""
     docs = load_documents(settings.docs_dir)
     chunks = chunk_documents(docs, settings.chunk_size, settings.chunk_overlap)
+    tag_chunk_type(chunks)
     logger.info("Embedding %d chunks from %d pages...", len(chunks), len(docs))
 
     index = FAISS.from_documents(chunks, _embeddings(settings))

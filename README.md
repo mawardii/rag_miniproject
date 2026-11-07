@@ -36,7 +36,8 @@ python -m venv .venv
 # source .venv/bin/activate   # macOS/Linux
 
 # 2. Install dependencies and dev tools
-pip install -e ".[dev]"
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
 
 # 3. Configure secrets
 copy example.env .env          # then fill in real keys
@@ -103,8 +104,20 @@ ruff check .        # lint
 ruff format .       # format
 rag-eval            # retrieval metrics against evals/golden.jsonl
 rag-eval --answers  # plus LLM-judged answer quality
-pytest              # pure unit tests; no API keys required
+python -m pytest -q # pure unit tests; no API keys required
 uvicorn rag.api.app:app --reload
+```
+
+GitHub Actions runs dependency compatibility, lint, formatting, and unit-test checks
+on Python 3.10 on Windows and Linux for every push and pull request. These checks
+do not need API keys, corpus PDFs, or a generated index. To run the same checks locally:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip check
+python -m ruff check .
+python -m ruff format --check .
+python -m pytest -q
 ```
 
 Retrieval and generation changes should ship with a `rag-eval` before/after delta.
@@ -125,5 +138,10 @@ python --version
 python -m pip show rag-miniproject
 ```
 
-If `pytest` or `python` points at a deleted base interpreter, the virtualenv is stale.
-Recreate it from a working Python 3.10+ install and rerun `pip install -e ".[dev]"`.
+If `pytest` or `python` reports a missing base interpreter, verify that the installed
+Python is accessible from the current shell (including its sandbox permissions).
+If the interpreter was deleted, recreate the virtualenv from a working Python
+3.10+ install and rerun `pip install -e ".[dev]"`. Prefer a fresh `.venv` over editing
+virtualenv launchers or `pyvenv.cfg`. You can bypass activation by using
+`.\.venv\Scripts\python.exe -m pytest -q` (and the same `python.exe -m` prefix for
+`pip` and `ruff`).
