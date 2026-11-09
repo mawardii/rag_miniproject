@@ -42,17 +42,15 @@ class Settings(BaseSettings):
     index_dir: Path = PROJECT_ROOT / "faiss_index"
     chunk_size: int = 800
     chunk_overlap: int = 120
-    top_k: int = 4
+    top_k: int = 8
 
     # Retrieval strategy — every mode is env-switchable (RETRIEVAL_MODE=dense rag-eval)
     # so configurations can be compared on the eval harness without code changes.
-    # Defaults are corpus-dependent and chosen by rag-eval, never by vibes.
-    # SEC-filings corpus (2026-07-18, 69 FinanceBench questions): dense 0.93 hit@4 /
-    # 0.81 MRR beat hybrid (0.86/0.77), hybrid+rerank (0.90/0.77), dense+rerank
-    # (0.91/0.83) — BM25's keyword votes drag in other companies' filings on a
-    # vocabulary-homogeneous corpus. (Old road-damage paper corpus: hybrid+rerank won.)
+    # Current 69-question evidence evaluation: fetch 20, rerank with source/page,
+    # return 8 => page hit 0.61 / recall 0.59, versus 0.33 / 0.30 at the old top-4
+    # default. Dense + table boost remains the candidate retrieval strategy.
     retrieval_mode: Literal["dense", "hybrid"] = "dense"
-    rerank_enabled: bool = False
+    rerank_enabled: bool = True
     fetch_k: int = 20  # candidates fetched before rerank/truncation to top_k
 
 

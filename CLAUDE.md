@@ -112,19 +112,29 @@ python -m pip show rag-miniproject
 - [ ] **Phase 7 - Deployment:** Dockerfile, docker-compose, health checks, and deploy
   docs.
 
-## Current Retrieval Baseline
+## Current Retrieval Default
+
+The current default is dense + table boost, fetch 20, DeepSeek rerank with source/page
+metadata, return 8 chunks. On the 69-question development set it achieves 98.6%
+filing hit@8, 60.9% evidence-page hit@8, 58.7% page recall@8, and 0.450 page MRR.
+Mean retrieval time was 1.48 seconds in one run. Before this experiment the top-4,
+no-rerank configuration achieved 89.9% filing hit, 33.3% page hit, and 29.7% page
+recall. See README's experiment table for controls and known regressions.
+These are retrieval metrics; answer correctness has not been remeasured.
+
+## Historical Retrieval Baseline
 
 Reference numbers for the SEC-filings corpus, 69 FinanceBench questions,
 `deepseek-v4-flash`, 2026-07-18:
 
 | Config | hit@4 | MRR |
 |---|---:|---:|
-| dense only (default) | 0.93 | 0.81 |
+| dense only (former default) | 0.93 | 0.81 |
 | hybrid | 0.86 | 0.77 |
 | hybrid + rerank | 0.90 | 0.77 |
 | dense + rerank | 0.91 | 0.83 |
 
-Answer quality at the default dense-only config: faithfulness 4.96/5, relevance
+Historical answer quality at the former dense-only config: faithfulness 4.96/5, relevance
 4.97/5, correctness 3.75/5. The correctness gap appears concentrated in numeric
 and table-heavy questions.
 

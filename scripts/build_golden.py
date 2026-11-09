@@ -27,6 +27,17 @@ def main() -> None:
             "expected_sources": [row["doc_name"] + ".pdf"],
             "answer": row["answer"],
             "financebench_id": row["financebench_id"],
+            "question_type": row["question_type"],
+            "question_reasoning": row["question_reasoning"],
+            "evidence": [
+                {
+                    "source": evidence["doc_name"] + ".pdf",
+                    # FinanceBench uses zero-based PDF indexes; golden pages are one-based.
+                    "page": evidence["evidence_page_num"] + 1,
+                    "text": evidence["evidence_text"],
+                }
+                for evidence in row["evidence"]
+            ],
         }
         for row in rows
         if row["doc_name"] in corpus

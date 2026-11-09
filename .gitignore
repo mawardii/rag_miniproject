@@ -18,6 +18,7 @@ faiss_index/
 
 # Corpus PDFs are public SEC filings — fetched via scripts/download_corpus.py, not committed
 docs/*.pdf
+evals/results/
 
 # IDE / OS noise
 .vscode/

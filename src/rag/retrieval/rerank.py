@@ -15,6 +15,8 @@ from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from rag.generation.prompts import format_context
+
 logger = logging.getLogger(__name__)
 
 RERANK_SYSTEM = """\
@@ -51,11 +53,9 @@ def llm_rerank(
     if len(docs) <= top_k:
         return docs
 
-    # Full chunks (800 chars), not halves — a chunk whose key sentence starts late
-    # must be judged on it. ~20x800 chars is still only ~4k tokens.
-    passages = "\n\n".join(
-        f"[{i}] {' '.join(d.page_content.split())[:800]}" for i, d in enumerate(docs, 1)
-    )
+    # Include filing/year and page so similar tables from different companies
+    # can be distinguished. Keep full chunks, including trailing financial rows.
+    passages = format_context(docs)
     try:
         # JSON mode guarantees syntactically valid JSON — kills the "digit-scrape
         # picks up numbers from model chatter" silent-corruption mode.

@@ -22,7 +22,10 @@ Question answering:
 Retrieval strategy is config-switchable: dense-only, hybrid dense+BM25 with Reciprocal
 Rank Fusion, and optional listwise LLM reranking. The default is chosen by measurement
 on the eval set, per corpus. On the current SEC-filings corpus (69 FinanceBench
-questions), dense-only is the default measured winner: 0.93 hit@4 / 0.81 MRR.
+questions), the current default fetches 20 dense/table-boost candidates, reranks
+with DeepSeek using filing/page metadata, and returns up to 8 chunks. It reaches
+0.61 evidence-page hit@8 and 0.59 evidence-page recall@8. The earlier dense-only
+0.93 filing hit@4 / 0.81 filing MRR baseline is historical, before the table boost.
 
 Two API providers are involved on purpose: OpenAI serves embeddings because DeepSeek
 does not provide embeddings, and DeepSeek generates answers.
@@ -104,6 +107,7 @@ ruff check .        # lint
 ruff format .       # format
 rag-eval            # retrieval metrics against evals/golden.jsonl
 rag-eval --answers  # plus LLM-judged answer quality
+rag-eval --output evals/results/retrieval.json # save metrics and full retrieved chunks
 python -m pytest -q # pure unit tests; no API keys required
 uvicorn rag.api.app:app --reload
 ```
@@ -121,6 +125,74 @@ python -m pytest -q
 ```
 
 Retrieval and generation changes should ship with a `rag-eval` before/after delta.
+
+### Evidence-level evaluation
+
+`python scripts/build_golden.py` preserves FinanceBench's evidence text and page
+annotations for all 69 questions. Golden `evidence[].page` values are **one-based PDF
+page numbers**, converted from FinanceBench's zero-based `evidence_page_num`; they
+are not the page labels printed inside a filing. Chunk metadata remains zero-based
+and is converted during evaluation. The 84 original evidence annotations were checked
+against the corresponding local PDF pages using normalized extracted full-page text.
+
+The evaluator reports distinct measures:
+
+- **Filing hit@k:** any chunk from an expected filing appears in the top k.
+- **Filing MRR (unique sources):** the historical metric, ranking deduplicated filenames.
+- **Evidence-page hit@k:** any retrieved chunk matches an annotated source and page.
+- **Evidence-page recall@k:** the fraction of distinct annotated source/page pairs
+  retrieved, averaged per annotated question. Multiple chunks from one page count once.
+- **Evidence-page MRR:** reciprocal rank of the first matching page, using actual
+  chunk positions, including repeated filenames.
+
+Older golden files without evidence still work; their questions are excluded from
+evidence metrics, and annotation coverage is printed explicitly. Page matches are
+an intermediate check: a chunk can come from the correct page and still omit the
+required row, year header, or units. Use the JSON report's full `retrieved_chunks`
+and the golden set's evidence text to audit whether the answer inputs are present.
+In particular, inspect both a narrative question and a calculation requiring several
+pages before interpreting a page hit as sufficient evidence.
+
+Reports under `evals/results/` are generated local artifacts and ignored by git.
+Evaluation makes query-embedding API calls; `--answers` additionally generates and
+judges answers. The historical 0.93 hit@4 / 0.81 MRR figures above are filing-level
+results and predate the table boost, which is enabled in the current pipeline.
+
+### Wider retrieval experiment
+
+Measured on the same 69 questions, with unchanged embeddings, corpus, chunking,
+and table boost. All reranked runs fetch 20 candidates and use DeepSeek.
+
+| Configuration | Filing hit | Evidence-page hit | Page recall | Page MRR | Mean retrieval time |
+|---|---:|---:|---:|---:|---:|
+| Previous default, 4 chunks | 89.9% | 33.3% | 29.7% | 0.204 | not recorded |
+| 8 chunks, no reranking | 94.2% | 40.6% | 37.7% | 0.205 | 0.29 s |
+| 8 chunks, reranking without source metadata | 97.1% | 60.9% | 58.7% | 0.440 | 1.57 s |
+| **Current: 8 chunks, reranking with source/page** | **98.6%** | **60.9%** | **58.7%** | **0.450** | **1.48 s** |
+
+The first four chunks of the current reranked result already hit an annotated
+page for 39/69 questions (56.5%), versus 23/69 (33.3%) in the previous default.
+At eight chunks it gains 20 page hits and loses one versus that baseline. The
+remaining regression is Best Buy FY2023 cash-flow comparison: the retrieved
+context includes discussion but omits the needed cash-flow totals. Best Buy's
+acquisition question now retrieves both acquired company names. AES inventory
+turnover still lacks cost of sales, and PepsiCo EBITDA less capex still lacks
+capital spending despite retrieving its income and cash-flow pages.
+
+This is retrieval evaluation on the development set, not held-out validation or
+an answer-correctness measurement. Context text grows from about 2.8k to 5.8k
+characters per question, plus one reranking call, increasing token usage. Timing
+is a single-run mean, not a latency guarantee. Rerank errors fall back to the
+candidate order. To reproduce the old configuration in PowerShell:
+
+```powershell
+$env:RERANK_ENABLED = 'false'
+$env:TOP_K = '4'
+rag-eval --output evals/results/previous-default.json
+```
+
+For the current configuration, set `RERANK_ENABLED=true`, `TOP_K=8`, and
+`FETCH_K=20` before running `rag-eval`. These options do not rebuild the index.
 
 The index carries a fingerprint: embedding model, chunk params, corpus hash, and
 pipeline version. `rag-ingest` and the app rebuild automatically when it goes stale.

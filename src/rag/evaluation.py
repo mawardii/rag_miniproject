@@ -1,9 +1,9 @@
 """Evaluation harness: `rag-eval [--answers] [--golden path]`.
 
 Retrieval metrics (fast, embeddings-only):
-- hit@k: fraction of questions where any expected source appears in the top-k
-- MRR:   mean reciprocal rank of the first expected source (rank over unique
-         sources in retrieval order)
+- filing hit@k and filing MRR (rank over unique filenames, for historical comparison)
+- evidence-page hit@k, recall@k, and MRR (rank over actual retrieved chunks)
+  Page matches do not guarantee that a chunk contains the answer-bearing text.
 
 Answer metrics (--answers; one generation + one judge LLM call per question):
 - faithfulness: is every claim in the answer supported by the retrieved context?
@@ -19,7 +19,8 @@ import logging
 import re
 import statistics
 import sys
-from dataclasses import dataclass
+import time
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -64,19 +65,38 @@ class RetrievalRow:
     hit: bool
     reciprocal_rank: float
     retrieved: list[str]
+    evidence_page_hit: bool | None = None
+    evidence_page_recall: float | None = None
+    evidence_page_reciprocal_rank: float | None = None
+    expected_pages: list[tuple[str, int]] = field(default_factory=list)
+    retrieved_chunks: list[dict] = field(default_factory=list)
+    retrieval_latency_s: float = 0.0
 
 
 def load_golden(path: Path) -> list[dict]:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
     if not rows:
         raise RuntimeError(f"Golden set is empty: {path}")
+    for row in rows:
+        for evidence in row.get("evidence", []):
+            if (
+                not isinstance(evidence.get("source"), str)
+                or not evidence["source"]
+                or type(evidence.get("page")) is not int
+                or evidence["page"] < 1
+                or not isinstance(evidence.get("text"), str)
+                or not evidence["text"].strip()
+            ):
+                raise ValueError("Evidence requires a source, a one-based integer page, and text")
     return rows
 
 
 def evaluate_retrieval(pipeline: RAGPipeline, golden: list[dict]) -> list[RetrievalRow]:
     rows = []
     for item in golden:
+        started = time.perf_counter()
         docs = pipeline.retrieve(item["question"])
+        latency = time.perf_counter() - started
         # Rank unique sources in retrieval order (several chunks may share a source).
         seen: list[str] = []
         for doc in docs:
@@ -85,15 +105,60 @@ def evaluate_retrieval(pipeline: RAGPipeline, golden: list[dict]) -> list[Retrie
                 seen.append(source)
         expected = set(item["expected_sources"])
         rank = next((i for i, s in enumerate(seen, 1) if s in expected), None)
+        expected_pages = {(e["source"], e["page"]) for e in item.get("evidence", [])}
+        chunks = [
+            {
+                "source": doc.metadata.get("source", "unknown"),
+                "page": doc.metadata["page"] + 1 if doc.metadata.get("page") is not None else None,
+                "text": doc.page_content,
+            }
+            for doc in docs
+        ]
+        pages = [(chunk["source"], chunk["page"]) for chunk in chunks]
+        evidence_rank = next((i for i, page in enumerate(pages, 1) if page in expected_pages), None)
         rows.append(
             RetrievalRow(
                 question=item["question"],
                 hit=rank is not None,
                 reciprocal_rank=1.0 / rank if rank else 0.0,
                 retrieved=seen,
+                evidence_page_hit=evidence_rank is not None if expected_pages else None,
+                evidence_page_recall=(
+                    len(expected_pages.intersection(pages)) / len(expected_pages)
+                    if expected_pages
+                    else None
+                ),
+                evidence_page_reciprocal_rank=(1.0 / evidence_rank if evidence_rank else 0.0)
+                if expected_pages
+                else None,
+                expected_pages=sorted(expected_pages),
+                retrieved_chunks=chunks,
+                retrieval_latency_s=latency,
             )
         )
     return rows
+
+
+def summarize_retrieval(rows: list[RetrievalRow]) -> dict:
+    annotated = [row for row in rows if row.evidence_page_hit is not None]
+    return {
+        "questions": len(rows),
+        "annotated_questions": len(annotated),
+        "mean_retrieval_latency_s": statistics.mean(row.retrieval_latency_s for row in rows),
+        "filing_hit_rate": statistics.mean(row.hit for row in rows),
+        "filing_mrr_unique_sources": statistics.mean(row.reciprocal_rank for row in rows),
+        "evidence_page_hit_rate": (
+            statistics.mean(row.evidence_page_hit for row in annotated) if annotated else None
+        ),
+        "evidence_page_recall": (
+            statistics.mean(row.evidence_page_recall for row in annotated) if annotated else None
+        ),
+        "evidence_page_mrr": (
+            statistics.mean(row.evidence_page_reciprocal_rank for row in annotated)
+            if annotated
+            else None
+        ),
+    }
 
 
 def judge_answer(pipeline: RAGPipeline, question: str, reference: str | None) -> tuple[dict, str]:
@@ -130,6 +195,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate the RAG pipeline.")
     parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
     parser.add_argument(
+        "--output", type=Path, help="Save retrieval metrics and full chunks as JSON."
+    )
+    parser.add_argument(
         "--answers",
         action="store_true",
         help="Also generate and LLM-judge answers (costs one gen + one judge call per question).",
@@ -149,10 +217,38 @@ def main() -> None:
         print(f"  [{marker}] rr={row.reciprocal_rank:.2f}  {row.question[:70]}")
         if not row.hit:
             print(f"         got: {row.retrieved}")
+        if row.evidence_page_hit is not None:
+            print(
+                f"         evidence page hit={row.evidence_page_hit} "
+                f"recall={row.evidence_page_recall:.2f} "
+                f"rr={row.evidence_page_reciprocal_rank:.2f}"
+            )
 
-    hit_rate = sum(r.hit for r in rows) / len(rows)
-    mrr = statistics.mean(r.reciprocal_rank for r in rows)
-    print(f"\nretrieval: hit@{settings.top_k}={hit_rate:.2f}  MRR={mrr:.2f}")
+    metrics = summarize_retrieval(rows)
+    print(
+        f"\nfiling hit@{settings.top_k}={metrics['filing_hit_rate']:.2f}  "
+        f"filing MRR (unique sources)={metrics['filing_mrr_unique_sources']:.2f}"
+    )
+    print(
+        f"evidence annotations: {metrics['annotated_questions']}/{metrics['questions']} questions"
+    )
+    if metrics["annotated_questions"]:
+        print(
+            f"evidence-page hit@{settings.top_k}={metrics['evidence_page_hit_rate']:.2f}  "
+            f"recall@{settings.top_k}={metrics['evidence_page_recall']:.2f}  "
+            f"MRR (chunk ranks)={metrics['evidence_page_mrr']:.2f}"
+        )
+    if args.output:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        report = {
+            "config": describe_config(settings),
+            "table_boost_enabled": True,
+            "golden": str(args.golden),
+            "metrics": metrics,
+            "rows": [asdict(row) for row in rows],
+        }
+        args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Retrieval report saved to {args.output}")
 
     if args.answers:
         print("\njudging answers (LLM calls)...")
